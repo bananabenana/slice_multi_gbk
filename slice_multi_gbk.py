@@ -2,15 +2,15 @@
 # Slices/subsections genbank files by either gene names or base pair range. This handles multi-genbank files which have multiple contigs
 
 # Usage:
-#   slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -o gene_sliced_output.gbk # This will extract the region between two genes including these genes
-#   slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -o locus_tag_sliced_output.gbk # This will extract the region between two locus tags if gene names not available
-#   slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -n 2 -o gene_sliced_output.gbk # This will extract 2 genes up- and down-stream of your specified two genes
-#   slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -n 2 -o locus_tag_sliced_output.gbk
-#   slice_multi_gbk.py -i infile.gbk -g gene1: -o gene_extract_output.gbk # This will extract a single gene
-#   slice_multi_gbk.py -i infile.gbk -g gene*: -o gene_extract_output.gbk # This will extract any genes matching this wildcard
-#   slice_multi_gbk.py -i infile.gbk -g gene1: -n 3 -o gene_extract_output.gbk # This will extract a single gene and 3 genes up- and down-stream of the gene
-#   slice_multi_gbk.py -i infile.gbk -lt locus_tag: -n 3 -o gene_extract_output.gbk # This will extract a single locus tag and 3 genes up- and down-stream of this
-#   slice_multi_gbk.py -i infile.gbk -r start:end:contig -o range_sliced_output.gbk # This will slice via base pair range and locus/contig. This is required to handle multi-genbank files
+#   slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -o gene_sliced_output # This will extract the region between two genes including these genes
+#   slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -o locus_tag_sliced_output # This will extract the region between two locus tags if gene names not available
+#   slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -n 2 -o gene_sliced_output # This will extract 2 genes up- and down-stream of your specified two genes
+#   slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -n 2 -o locus_tag_sliced_output
+#   slice_multi_gbk.py -i infile.gbk -g gene1: -o gene_extract_output # This will extract a single gene
+#   slice_multi_gbk.py -i infile.gbk -g gene*: -o wildcard_gene_extract_output # This will extract any genes matching this wildcard
+#   slice_multi_gbk.py -i infile.gbk -g gene1: -n 3 -o gene_extract_output # This will extract a single gene and 3 genes up- and down-stream of the gene
+#   slice_multi_gbk.py -i infile.gbk -lt locus_tag: -n 3 -o gene_extract_output # This will extract a single locus tag and 3 genes up- and down-stream of this
+#   slice_multi_gbk.py -i infile.gbk -r start:end:contig -o range_sliced_output # This will slice via base pair range and locus/contig. This is required to handle multi-genbank files
 
 # Inputs:
 #   1) Genbank file [.gbk, .gbff, .gb]
@@ -261,4 +261,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
