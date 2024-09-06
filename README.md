@@ -30,6 +30,9 @@ slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -n 2 -o locus_tag_sli
 slice_multi_gbk.py -i infile.gbk -g gene1: -o gene_extract_output.gbk # using gene names
 slice_multi_gbk.py -i infile.gbk -lt locus_tag1: -o locus_tag_sliced_output.gbk # using locus tags
 
+# Use a wildcard to extract gene/s
+slice_multi_gbk.py -i infile.gbk -g gene*: -o wildcard_gene_extract_output
+
 # Extract a single gene and 3 genes up- and down-stream of the gene
 slice_multi_gbk.py -i infile.gbk -g gene1: -n 3 -o gene_extract_output.gbk # using gene names
 slice_multi_gbk.py -i infile.gbk -lt locus_tag: -n 3 -o gene_extract_output.gbk # using locus tags
