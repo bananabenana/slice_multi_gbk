@@ -20,6 +20,7 @@ python slice_multi_gbk.py -h
 ```bash
 # Extract the region between two genes including these genes
 slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -o gene_sliced_output # using gene names
+slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -o gene_sliced_output -p # using gene names, also outputting multifasta protein and CDS files with sliced genbank
 slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -o locus_tag_sliced_output # using locus tags
 
 # Extract 2 genes up- and down-stream of your specified two genes
