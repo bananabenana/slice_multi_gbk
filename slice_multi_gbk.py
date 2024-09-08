@@ -61,7 +61,7 @@ def get_args():
         parser.add_argument('-lt', '--locus_tags', help='The locus tag of the gene to slice if gene name is not available. Handles wildcards (*). Example: -lt DKHHJM_01915:')
         parser.add_argument('-r', '--range', action='store', help='The two base pair coordinates (range) to slice between. Contig name or locus must be provided. Example: 612899:630276:contig_1')
         parser.add_argument('-o', '--outfile', required=True, help='Output directory and filename prefix')
-        parser.add_argument('-p', '--produce_multifasta', action='store_true', help='Produce multifasta files for nucleotide (CDS) and amino acid sequences of all sliced genbanks.')
+        parser.add_argument('-p', '--protein', action='store_true', help='Produce multifasta files for nucleotide (CDS) and amino acid sequences of all sliced genbanks.')
         parser.add_argument('-c', '--case_insensitive', action='store_true', help='Turn off case sensitivity for gene and locus tag matching.')
         parser.add_argument('-v', '--version', action='version', version='%(prog)s version 2.1.0')
 
