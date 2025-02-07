@@ -1,40 +1,20 @@
-#!/usr/bin/env python3
-# Slices/subsections genbank files by either gene names or base pair range. This handles multi-genbank files which have multiple contigs
-
-# Usage:
-#   slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -o gene_sliced_output # This will extract the region between two genes including these genes
-#   slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -o gene_sliced_output -p # This will extract the region between two genes including these genes, also outputting multi-fasta protein and CDS files too
-#   slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -o locus_tag_sliced_output # This will extract the region between two locus tags if gene names not available
-#   slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -n 2 -o gene_sliced_output # This will extract 2 genes up- and down-stream of your specified two genes
-#   slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -n 2 -o locus_tag_sliced_output
-#   slice_multi_gbk.py -i infile.gbk -g gene1: -o gene_extract_output # This will extract a single gene
-#   slice_multi_gbk.py -i infile.gbk -g gene*: -o wildcard_gene_extract_output # This will extract any genes matching this wildcard
-#   slice_multi_gbk.py -i infile.gbk -g gene1: -n 3 -o gene_extract_output # This will extract a single gene and 3 genes up- and down-stream of the gene
-#   slice_multi_gbk.py -i infile.gbk -lt locus_tag: -n 3 -o gene_extract_output # This will extract a single locus tag and 3 genes up- and down-stream of this
-#   slice_multi_gbk.py -i infile.gbk -r start:end:contig -o range_sliced_output # This will slice via base pair range and locus/contig. This is required to handle multi-genbank files
-
-# Inputs:
-#   1) Genbank file [.gbk, .gbff, .gb]
-#   2) One of:
-#       - Two gene names
-#       - Two base pair range and locus
+# Slices/subsections genbank files by either gene names or base pair range. Additionally, can extract target genes ± x number of genes, or ± x bp window. Handles multi-genbank files which have multiple contigs.
 
 # Requirements:
-#   - biopython (1.84)
+#   - biopython (any)
 
-# Author: Ben Vezina, Abhinaba Ray
+# Author: Ben Vezina
 #   - Scholar: https://scholar.google.com/citations?user=Rf9oh94AAAAJ&hl=en&oi=ao
 #   - ORCID: https://orcid.org/0000-0003-4224-2537
 
-# Citation: https://gist.github.com/bananabenana/20ff257f237d5a6e6f449fd7066577a1
+# Citation: https://github.com/bananabenana/slice_multi_gbk/
 # Adapted from https://gist.github.com/jrjhealey/2df3c65c7a70cbca4862e94620e4d7b2
 
-#!/usr/bin/env python3
-# Slices/subsections genbank files by either gene names or base pair range. This handles multi-genbank files which have multiple contigs
 
 from Bio import SeqIO
 import sys, argparse
 import os
+import re
 from argparse import RawTextHelpFormatter
 import fnmatch
 
@@ -44,26 +24,29 @@ def get_args():
         parser = argparse.ArgumentParser(
             description='Subset genbanks between 1 gene, 2 genes or base pair ranges.\n'
                         'usage:\n'
-                        '  slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -o prefix\n'
-                        '  slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -o prefix\n'
-                        '  slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -n [integer] -o prefix\n'
-                        '  slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -n [integer] -o prefix\n'
-                        '  slice_multi_gbk.py -i infile.gbk -g gene1: -o prefix\n'
-                        '  slice_multi_gbk.py -i infile.gbk -g gene*: -o prefix\n'
-                        '  slice_multi_gbk.py -i infile.gbk -g gene1: -n [integer] -o prefix\n'
-                        '  slice_multi_gbk.py -i infile.gbk -lt locus_tag: -n [integer] -o prefix\n'
-                        '  slice_multi_gbk.py -i infile.gbk -r start:end:contig -o prefix\n',
+                        '  slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -o prefix  # Slice between two genes (inclusive of genes) \n'
+                        '  slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -o prefix  # Slice between two locus tags (inclusive) \n'
+                        '  slice_multi_gbk.py -i infile.gbk -g gene1:gene2 -n [integer] -o prefix  # Slice between two genes (inclusive) plus [integer] genes up- and down-stream \n'
+                        '  slice_multi_gbk.py -i infile.gbk -lt locus_tag1:locus_tag2 -n [integer] -o prefix  # Slice between two locus tags (inclusive) plus [integer] locus tags up- and down-stream \n'
+                        '  slice_multi_gbk.py -i infile.gbk -g gene1: -o prefix  # Slice one gene \n'
+                        '  slice_multi_gbk.py -i infile.gbk -g gene*: -o prefix  # Slice all genes matching wildcard \n'
+                        '  slice_multi_gbk.py -i infile.gbk -g gene1: -n [integer] -o prefix  # Slice one gene plus [integer] genes up- and down-stream \n'
+                        '  slice_multi_gbk.py -i infile.gbk -lt locus_tag: -n [integer] -o prefix  # Slice one locus tag plus [integer] locus tag up- and down-stream \n'
+                        '  slice_multi_gbk.py -i infile.gbk -g gene1: -w [integer] -o prefix  # Slice one gene plus [integer] basepairs up- and down-stream \n'
+                        '  slice_multi_gbk.py -i infile.gbk -lt locus_tag: -w [integer] -o prefix  # Slice one locus tag plus [integer] basepairs up- and down-stream \n'
+                        '  slice_multi_gbk.py -i infile.gbk -r start:end:contig -o prefix  # Slice base pair range and locus/contig. Contig information required to handle multi-genbank files \n',
             formatter_class=RawTextHelpFormatter)
 
         parser.add_argument('-i', '--infile', action='store', help='Input genbank [.gbk, .gbff] file to slice or subsection. Can be a multi-genbank file with multiple contigs')
         parser.add_argument('-g', '--genes', action='store', help='The two gene names to slice between. Handles wildcards (*). Example: -g hemF:maeB. A single gene can be extracted using one gene name. Example: -g hemF:')
         parser.add_argument('-n', '--num_genes', help='Number of genes to slice before and after the selected genes. Can be used with -g or -lt only. Will take maximum number of genes up/downstream if at end of a contig. Optional. Example: -n 2', type=int, default=0)
+        parser.add_argument('-w', '--window', help='Number of base pairs to slice before and after the selected gene/locus tag. Example: -w 10000 for 10kb up/downstream', type=int)
         parser.add_argument('-lt', '--locus_tags', help='The locus tag of the gene to slice if gene name is not available. Handles wildcards (*). Example: -lt DKHHJM_01915:')
         parser.add_argument('-r', '--range', action='store', help='The two base pair coordinates (range) to slice between. Contig name or locus must be provided. Example: 612899:630276:contig_1')
         parser.add_argument('-o', '--outfile', required=True, help='Output directory and filename prefix')
         parser.add_argument('-p', '--protein', action='store_true', help='Produce multifasta files for nucleotide (CDS) and amino acid sequences of all sliced genbanks.')
         parser.add_argument('-c', '--case_insensitive', action='store_true', help='Turn off case sensitivity for gene and locus tag matching.')
-        parser.add_argument('-v', '--version', action='version', version='%(prog)s version 2.1.0')
+        parser.add_argument('-v', '--version', action='version', version='%(prog)s version 3.0.0')
 
         if len(sys.argv) == 1:
             parser.print_help(sys.stderr)
@@ -75,6 +58,7 @@ def get_args():
 
 def gene_matches(gene_name, pattern, case_insensitive):
     """Check if a gene name matches the pattern, respecting case sensitivity."""
+    print(f"Matching {gene_name} against pattern {pattern}")  # Debugging line
     if case_insensitive:
         return fnmatch.fnmatch(gene_name.lower(), pattern.lower())
     else:
@@ -95,6 +79,7 @@ def write_multifasta(record, base_filename, produce_multifasta):
     nucleotides = []
     amino_acids = []
 
+    # Iterate over features and collect sequences
     for feature in record.features:
         if feature.type == "CDS":
             gene_name = feature.qualifiers.get('gene', ['unknown_gene'])[0]
@@ -104,185 +89,171 @@ def write_multifasta(record, base_filename, produce_multifasta):
                 aa_seq = feature.qualifiers['translation'][0]
                 amino_acids.append(f">{gene_name}\n{aa_seq}\n")
 
+    # Ensure output directory exists
+    output_dir = os.path.dirname(base_filename)
+    os.makedirs(output_dir, exist_ok=True)
+
     # Write nucleotide multifasta
     if nucleotides:
-        fasta_file_fna = f"{base_filename}.fna"
+        fasta_file_fna = f"{base_filename}_nucleotides.fna"
         with open(fasta_file_fna, "w") as fna_file:
             fna_file.writelines(nucleotides)
         print(f"Wrote nucleotide multifasta to {fasta_file_fna}")
 
     # Write amino acid multifasta
     if amino_acids:
-        fasta_file_faa = f"{base_filename}.faa"
+        fasta_file_faa = f"{base_filename}_amino_acids.faa"
         with open(fasta_file_faa, "w") as faa_file:
             faa_file.writelines(amino_acids)
         print(f"Wrote amino acid multifasta to {fasta_file_faa}")
 
-def process_records(input_file, genes, num_genes, output_prefix, produce_multifasta):
-    extraction_counter = 1  # Initialize extraction counter
 
-    # Parse the input file
-    for record in SeqIO.parse(input_file, "genbank"):
-        # Call the function and pass the extraction_counter
-        success = slice_gene(record, genes, num_genes, output_prefix, produce_multifasta, extraction_counter)
-        
-        # Increment the extraction_counter
-        if success:
-            extraction_counter += 1
-
-def slice_gene(record, genes_patterns, num_genes, output_prefix, produce_multifasta, extraction_counter, case_insensitive):
-    loci = [feat for feat in record.features if feat.type == "CDS"]
+def slice_genomic_data(record, patterns, num_genes, window_size, case_insensitive, output_prefix, produce_multifasta, extraction_counter, is_gene=True):
+    # Determine whether we are slicing by gene or locus tag
+    if is_gene:
+        loci_key = 'gene'
+        match_function = gene_matches
+        patterns_str = "genes"
+    else:
+        loci_key = 'locus_tag'
+        match_function = locus_tag_matches
+        patterns_str = "locus tags"
     
-    try:
-        # Find indices of the target genes
-        target_indices = [
-            idx for idx, feat in enumerate(loci)
-            if 'gene' in feat.qualifiers and any(gene_matches(feat.qualifiers['gene'][0], pattern, case_insensitive) for pattern in genes_patterns)
-        ]
+    loci = [feat for feat in record.features if feat.type == "CDS"]
+    if not loci:
+        print(f"No CDS features found in record {record.id}.")
+        return 0
 
-        if not target_indices:
-            print(f"No matching genes found for patterns: {genes_patterns}")
-            return 0
+    # Split and clean the patterns
+    patterns = [p.strip() for p in patterns]
+    patterns = [p for p in patterns if p]
 
-        min_target_idx = min(target_indices)
-        max_target_idx = max(target_indices)
+    if not patterns:
+        print(f"No {patterns_str} provided.")
+        return 0
 
-        # Calculate start index, ensuring it doesn't go below 0
-        start_idx = max(0, min_target_idx - num_genes)
+    start_pattern = patterns[0]
+    end_pattern = patterns[1] if len(patterns) >= 2 else None
 
-        # Calculate end index, ensuring it doesn't exceed the list length
-        end_idx = min(len(loci) - 1, max_target_idx + num_genes)
+    # Compile the pattern for wildcard matching
+    start_regex = re.compile(start_pattern, re.IGNORECASE if case_insensitive else 0)
+    end_regex = re.compile(end_pattern, re.IGNORECASE if case_insensitive else 0) if end_pattern else None
+
+    # Find all genes that match the start pattern
+    matching_start_genes = []
+    for idx, feat in enumerate(loci):
+        if loci_key in feat.qualifiers:
+            current_name = feat.qualifiers[loci_key][0]
+            if start_regex.match(current_name):
+                matching_start_genes.append(idx)
+
+    if not matching_start_genes:
+        print(f"No matching {loci_key} found for start pattern '{start_pattern}'")
+        return 0
+
+    # Iterate over all matching start genes
+    total_extracted = 0
+    for start_idx in matching_start_genes:
+        # Find the end gene if an end pattern is provided
+        end_idx = start_idx  # default to start_idx if no end pattern
+        if end_pattern is not None:
+            found = False
+            for idx in range(start_idx + 1, len(loci)):
+                feat = loci[idx]
+                if loci_key in feat.qualifiers:
+                    current_name = feat.qualifiers[loci_key][0]
+                    if end_regex.match(current_name):
+                        end_idx = idx
+                        found = True
+                        break
+            if not found:
+                print(f"No matching {loci_key} found for end pattern '{end_pattern}' after start pattern '{start_pattern}'")
+                continue  # skip to the next start gene
+
+        # Apply num_genes if provided
+        if num_genes > 0:
+            new_start_idx = max(0, start_idx - num_genes)
+            new_end_idx = min(len(loci) - 1, end_idx + num_genes)
+            start_idx = new_start_idx
+            end_idx = new_end_idx
 
         start_locus = loci[start_idx]
         end_locus = loci[end_idx]
 
-        start = int(start_locus.location.start)
-        end = int(end_locus.location.end)
+        start_pos = int(start_locus.location.start)
+        end_pos = int(end_locus.location.end)
 
-        subrecord = record[start:end]
-
-        actual_upstream = min_target_idx - start_idx
-        actual_downstream = end_idx - max_target_idx
+        # Apply window if provided
+        if window_size is not None:
+            desired_start = start_pos - window_size
+            desired_end = end_pos + window_size
+            start_pos = max(0, desired_start)
+            end_pos = min(len(record.seq), desired_end)
 
         # Ensure the output directory exists
-        if not os.path.exists(output_prefix):
-            os.makedirs(output_prefix)
+        os.makedirs(output_prefix, exist_ok=True)
 
-        # Generate base filename with extraction counter
-        base_filename = os.path.join(output_prefix, f"{output_prefix}_{extraction_counter}_{genes_patterns[0]}_{record.id}")
+        window_suffix = f"_{window_size}bp_window" if window_size is not None else ""
+        num_genes_suffix = f"_{num_genes}genes" if num_genes > 0 else ""
+        # Include start_idx and end_idx in the filename to make it unique
+        base_filename = os.path.join(output_prefix, f"{output_prefix}_{extraction_counter}_{start_idx}_{end_idx}_{start_pattern}_to_{end_pattern if end_pattern else ''}{num_genes_suffix}{window_suffix}_{record.id}")
 
         # Write GBK file
         filename_gbk = f"{base_filename}.gbk"
         with open(filename_gbk, "w") as gbk_file:
+            subrecord = record[start_pos:end_pos]
             SeqIO.write(subrecord, gbk_file, "genbank")
 
-        print(f"Extracted genes matching patterns {genes_patterns} with {actual_upstream} gene(s) upstream and {actual_downstream} gene(s) downstream from {record.id} into {filename_gbk}")
+        print(f"Extracted {patterns_str} matching patterns {patterns} from {start_pos} to {end_pos} into {filename_gbk}")
 
         # Write multifasta files if requested
         if produce_multifasta:
             write_multifasta(subrecord, base_filename, produce_multifasta)
 
-        return 1
+        total_extracted += 1
 
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        return 0
+    return total_extracted
 
-def slice_locustag(record, locus_tags_patterns, num_genes, case_insensitive, output_prefix, produce_multifasta, extraction_counter):
-    loci = [feat for feat in record.features if feat.type == "CDS"]
-    
-    try:
-        # Find indices of the target locus tags
-        target_indices = [
-            idx for idx, feat in enumerate(loci)
-            if 'locus_tag' in feat.qualifiers and any(locus_tag_matches(feat.qualifiers['locus_tag'][0], pattern, case_insensitive) for pattern in locus_tags_patterns)
-        ]
-
-        if not target_indices:
-            print(f"No matching locus tags found for patterns: {locus_tags_patterns}")
-            return 0
-
-        min_target_idx = min(target_indices)
-        max_target_idx = max(target_indices)
-
-        # Calculate start index, ensuring it doesn't go below 0
-        start_idx = max(0, min_target_idx - num_genes)
-
-        # Calculate end index, ensuring it doesn't exceed the list length
-        end_idx = min(len(loci) - 1, max_target_idx + num_genes)
-
-        start_locus = loci[start_idx]
-        end_locus = loci[end_idx]
-
-        start = int(start_locus.location.start)
-        end = int(end_locus.location.end)
-
-        # Extract the subrecord for the entire region
-        subrecord = record[start:end]
-
-        actual_upstream = min_target_idx - start_idx
-        actual_downstream = end_idx - max_target_idx
-
-        # Ensure the output directory exists
-        if not os.path.exists(output_prefix):
-            os.makedirs(output_prefix)
-
-        # Generate base filename with extraction counter
-        base_filename = os.path.join(output_prefix, f"{output_prefix}_{extraction_counter}_locus_tags_{record.id}")
-
-        # Write GBK file
-        filename_gbk = f"{base_filename}.gbk"
-        with open(filename_gbk, "w") as output_handle:
-            SeqIO.write(subrecord, output_handle, "genbank")
-
-        print(f"Extracted locus tag regions with {actual_upstream} gene(s) upstream and {actual_downstream} gene(s) downstream from {record.id} into {filename_gbk}")
-
-        # Write multifasta files if requested
-        if produce_multifasta:
-            write_multifasta(subrecord, base_filename, produce_multifasta)
-
-        return 1
-
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        return 0
 
 def slice_range(record, start, end, contig, output_prefix, produce_multifasta):
     try:
         if contig == record.id:
             subrecord = record[start:end]
             
-            filename = f"{output_prefix}_{contig}_{start}_{end}.gbk"
+            filename = f"{output_prefix}_{start}_{end}_{contig}.gbk"
             output_path = os.path.join(output_prefix, filename)
-            
+
+            # Ensure the output directory exists
+            os.makedirs(output_prefix, exist_ok=True)
+
             with open(output_path, "w") as output_handle:
                 SeqIO.write(subrecord, output_handle, "genbank")
                 
             print(f"Extracted range from {start} to {end} on contig {contig} into {filename}")
             
+            # Write multifasta files if requested
             if produce_multifasta:
-                write_multifasta(subrecord, output_prefix, produce_multifasta)
-                    
+                # Create a base filename for multifasta files
+                base_filename = os.path.join(output_prefix, f"{output_prefix}_{start}_{end}_{contig}")
+                write_multifasta(subrecord, base_filename, produce_multifasta)
+
     except Exception as e:
         print(f"An error occurred: {str(e)}")
         return 0
 
     return 1
-
 def main():
     args = get_args()
     input_file = args.infile
     output_prefix = args.outfile
-    produce_multifasta = args.produce_multifasta
-    case_insensitive = args.case_insensitive  # Retrieve the case insensitive flag
+    produce_multifasta = args.protein
+    case_insensitive = args.case_insensitive
+    window_size = args.window
+
+    extraction_counter = 1
 
     try:
-        # Make output directory if it does not exist
-        if not os.path.exists(output_prefix):
-            os.makedirs(output_prefix)
-
-        # Initialize extraction counter
-        extraction_counter = 1
+        os.makedirs(output_prefix, exist_ok=True)
 
         with open(input_file, "r") as file_handle:
             records = SeqIO.parse(file_handle, "genbank")
@@ -292,20 +263,27 @@ def main():
             for record in records:
                 if args.genes:
                     gene_list = args.genes.split(':')
-                    extracted = slice_gene(record, gene_list, args.num_genes, output_prefix, produce_multifasta, extraction_counter, case_insensitive)
-                    total_extracted += extracted
-                    extraction_counter += 1  # Increment extraction counter after each slice
+                    extracted = slice_genomic_data(record, gene_list, args.num_genes, window_size, case_insensitive, output_prefix, produce_multifasta, extraction_counter, is_gene=True)
+                    if extracted:
+                        total_extracted += extracted
+                        extraction_counter += 1
 
                 if args.locus_tags:
                     locus_tag_list = args.locus_tags.split(':')
-                    extracted = slice_locustag(record, locus_tag_list, args.num_genes, case_insensitive, output_prefix, produce_multifasta, extraction_counter)
-                    total_extracted += extracted
-                    extraction_counter += 1  # Increment extraction counter after each slice
+                    extracted = slice_genomic_data(record, locus_tag_list, args.num_genes, window_size, case_insensitive, output_prefix, produce_multifasta, extraction_counter, is_gene=False)
+                    if extracted:
+                        total_extracted += extracted
+                        extraction_counter += 1
 
                 if args.range:
-                    range_start, range_end, contig = args.range.split(':')
+                    range_components = args.range.split(':')
+                    if len(range_components) != 3:
+                        print("Invalid range format. Expected start:end:contig")
+                        continue
+                    range_start, range_end, contig = range_components
                     extracted = slice_range(record, int(range_start), int(range_end), contig, output_prefix, produce_multifasta)
-                    total_extracted += extracted
+                    if extracted:
+                        total_extracted += extracted
 
             print(f"Total records extracted: {total_extracted}")
     
