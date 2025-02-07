@@ -5,7 +5,10 @@ Slices/subsections genbank files by either gene names, locus tags or base pair r
 - biopython >1.84
 
 ## Installation
-Easiest to create a mamba/conda environment
+
+1) Download slice_multi_gbk.py from this repository
+2) Create a mamba/conda environment for biopython
+
 ```bash
 mamba create -y -n slice_gbk_env
 mamba install -y -n slice_gbk_env conda-forge::biopython=1.84
